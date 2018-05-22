@@ -11,7 +11,7 @@ cr() ->
 %erl -name n1@127.0.0.1 -setcookie "yim"
 
 hello() ->
-  io:fwrite("Hello World!\n").
+  %io:fwrite("Hello World!\n").
   %erlang:set_cookie(node(),'yim'),
   %net_adm:ping('n1@127.0.0.1'),
   %net_adm:ping('n2@127.0.0.2'),

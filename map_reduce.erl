@@ -43,44 +43,64 @@ split_into(N,L,Len) ->
 
 spawn_reducer(Parent,Reduce,I,Mappeds) ->
   Inputs = [KV || Mapped <- Mappeds,{J,KVs} <- Mapped,I==J,KV <- KVs],
-  fun() -> Parent ! {self(),reduce_seq(Reduce,Inputs)} end.
+  spawn_link(fun() ->
+    Parent ! {self(), reduce_seq(Reduce,Inputs)}
+             end).
 
 %% Distributed Map-Reduce
 map_reduce_dist(Map,M,Reduce,R,Input) ->
   Parent = self(),
   Splits = split_into(M,Input),
-
-  Mappers = [dist_reducer(Parent,Map,R,Split) || Split <- Splits],
+  io:fwrite("Splitting done. Starting mapping...\n"),
+  Mappers = [dist_mapper(Parent,Map,R,Split) || Split <- Splits],
   Mappeds = workers(Mappers),
-
-  Reducers = [dist_mapper(Parent,Reduce,I,Mappeds) || I <- lists:seq(0,R-1)],
+  io:fwrite("Mapping done. Starting reduce...\n"),
+  Reducers = [dist_reducer(Parent,Reduce,I,Mappeds) || I <- lists:seq(0,R-1)],
   Reduceds = workers(Reducers),
 
   Web_reduced=lists:sort(lists:flatten(Reduceds)),
   file:write_file("output_dist.txt", io_lib:fwrite("~p.\n", [Web_reduced])).
 
 dist_reducer(Parent,Reduce,I,Mappeds) ->
-  Inputs = [KV || Mapped <- Mappeds,{J,KVs} <- Mapped,I==J,KV <- KVs],
-  fun() -> Parent ! {self(),reduce_seq(Reduce,Inputs)} end.
+  Inputs = [KV || Mapped <- Mappeds, {J,KVs} <- Mapped, I==J, KV <- KVs],
+  fun() ->
+    Parent ! {self(),reduce_seq(Reduce,Inputs)}
+  end.
 
 dist_mapper(Parent,Map,R,Split) ->
+  Mapped = [{erlang:phash2(K2,R),{K2,V2}} || {K,V} <- Split, {K2,V2} <- Map (K,V) ],
   fun() ->
-    Mapped = [{erlang:phash2(K2,R),{K2,V2}} || {K,V} <- Split,{K2,V2} <- Map(K,V) ],
     Parent ! {self(),group(lists:sort(Mapped))}
   end.
 
-workers(Functions) -> workers(Functions,nodes(),[]).
+%Initialize worker pool
+workers(Functions) -> workers(Functions,nodes(),#{},[]).
 
-workers([Function|Functions],[Node| Free_nodes], Busy) ->
+workers([Function|Functions],[Node| Free_nodes], Busy, Return) ->
   % Assign jobs to free nodes
-  spawn_link(Node,Function),
+  spawn(Node,Function),
   Temp=maps:put(Node, Function, Busy),
-  workers(Functions, Free_nodes, Temp);
+  workers(Functions, Free_nodes, Temp, Return);
 
-workers(Function, [], Busy) ->
+workers(Functions, [], Busy, Return) ->
   % When a node is done, reassign a job to it.
   receive {Pid,L} ->
     %workers(Function, [Node], [{N,Funct}||{N,Funct}<-Busy, N =/= Node]),
-    Temp=maps:remove(node(Pid),Busy),
-    [L|workers(Function,[node(Pid)],Temp)]
+    io:fwrite("Node ~w finished its work, there are ~w chunks remaining\n",[node(Pid), length(Functions)]),
+    Busy2 =maps:remove(node(Pid),Busy),
+    Return2=lists:append(Return,[L]),
+    workers(Functions,[node(Pid)], Busy2,Return2)
+  end;
+
+workers([],_,#{},Return) -> Return;
+
+workers([], Nodes, Busy, Return)  ->
+  io:format("Waiting for processes to finish\n"),
+  receive {Pid,L} ->
+    Nodes2=lists:append(Nodes,node(Pid)),
+    Return2=lists:append(Return,[L]),
+    Busy2 =maps:remove(node(Pid),Busy),
+    workers([], Nodes2, Busy2, Return2)
+  %after 5000 ->
+  %  workers()
   end.
