@@ -96,7 +96,7 @@ workers([], Nodes, Busy, Return)  ->
       Busy2=maps:remove(node(Pid),Busy),
       workers([], [node(Pid)|Nodes], Busy2, [L|Return])
     after 5000 ->
-      io:fwrite("WARNING! ~w crashed! Reassigning the related task(fun)...\n", maps:keys(Busy)),
+      io:fwrite("WARNING! ~w timed out! Reassigning the task(fun)...\n", maps:keys(Busy)),
       workers(maps:values(Busy),Nodes,#{},Return)
     end
   end.

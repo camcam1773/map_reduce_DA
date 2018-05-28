@@ -8,22 +8,9 @@ cr() ->
   inets:stop(),
   dets:close(web).
 
-%erl -name n1@127.0.0.1 -setcookie "yim"
-
-hello() ->
-  %io:fwrite("Hello World!\n").
+start() ->
   %erlang:set_cookie(node(),'yim'),
   %net_adm:ping('n1@127.0.0.1'),
   %net_adm:ping('n2@127.0.0.2'),
-  %io:format("~p.\n", [nodes()]),
-  page_rank:page_rank_dist().
-
-hello2() ->
-  erlang:set_cookie(node(),'yim'),
-  %pool:start(mel,[]),
-  %pool:attach('n1@127.0.0.1'),
-  %pool:attach('n2@127.0.0.2'),
-  %io:format("~p.\n",[pool:get_nodes()]),
-  %pool:pspawn(page_rank,page_rank_par,[]).
-  %pool:attach('n3@127.0.0.3').
+  io:format("Nodes: ~p.\n", [[node()|nodes()]]),
   page_rank:page_rank_dist().
