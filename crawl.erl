@@ -17,7 +17,7 @@ crawl(Url,D) ->
 follow(0,KVs) ->
   KVs;
 follow(D,KVs) ->
-  follow(D-1,map_reduce:map_reduce_par(fun map/2,fun reduce/2,KVs)).
+  follow(D-1,map_reduce:map_reduce_seq(fun map/2,fun reduce/2,KVs)).
 
 map(Url,undefined) ->
   Body = fetch_url(Url),[{Url,Body}]++[{U,undefined} || U <- find_urls(Url,Body)];
